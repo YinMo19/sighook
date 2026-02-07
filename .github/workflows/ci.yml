@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          cc -O0 -fno-inline examples/inline_hook_far/target.c -o examples/inline_hook_far/app
+          cc -O0 -fno-inline -rdynamic examples/inline_hook_far/target.c -o examples/inline_hook_far/app
           SO="$PWD/target/x86_64-unknown-linux-gnu/debug/examples/libinline_hook_far.so"
           OUT=$(LD_PRELOAD="$SO" examples/inline_hook_far/app)
           echo "$OUT"
