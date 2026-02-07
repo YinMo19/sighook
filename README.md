@@ -25,7 +25,7 @@ It is designed for low-level experimentation, reverse engineering, and custom ru
 
 - `aarch64-apple-darwin`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
 - `aarch64-unknown-linux-gnu`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
-- `x86_64-unknown-linux-gnu`: `instrument` / `instrument_no_original` / `inline_hook` runtime validated in CI; `patchcode` remains raw-opcode oriented and needs architecture-correct opcode input
+- `x86_64-unknown-linux-gnu`: full API support; CI smoke validates `patchcode` / `instrument` / `instrument_no_original` / `inline_hook` examples
 - single-thread model (`static mut` internal state)
 
 ## Installation

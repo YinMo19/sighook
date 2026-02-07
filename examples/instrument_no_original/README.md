@@ -2,7 +2,10 @@
 
 Demonstrates `sighook::instrument_no_original`.
 
-The callback writes `x0 = 99`, and original opcode is skipped.
+The callback overwrites return register and skips original instruction:
+
+- `aarch64`: write `x0 = 99`
+- `linux x86_64`: write `rax = 99`
 
 ## Run (from repository root)
 

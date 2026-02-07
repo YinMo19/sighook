@@ -27,10 +27,10 @@ Available examples:
 
 - `aarch64-apple-darwin`: `patchcode` / `instrument` / `instrument_no_original` / `inline_hook`
 - `aarch64-unknown-linux-gnu`: runtime smoke coverage for all 4 examples (CI)
-- `x86_64-unknown-linux-gnu`: API compile coverage for all examples; runtime smoke coverage for `inline_hook_far` in CI. `patchcode_add_to_mul` remains AArch64-opcode specific demo
+- `x86_64-unknown-linux-gnu`: runtime smoke coverage for all 4 examples (CI)
 
 ## Notes by architecture
 
 - On `aarch64-unknown-linux-gnu`, `calc` examples expose a dedicated `calc_add_insn` symbol and resolve patch point by symbol (no fixed offset dependency).
 - On `aarch64-apple-darwin`, `calc` examples keep fixed `ADD_INSN_OFFSET=0x14` for the naked function layout.
-- On `x86_64`, examples compile for API smoke-check; runtime offsets/opcodes are architecture-specific and need per-binary recalculation before real testing.
+- On `x86_64-unknown-linux-gnu`, `calc` examples also use `calc_add_insn` symbol patchpoint. `patchcode_add_to_mul` patches `add eax, edx; nop; nop` into `imul eax, edx; nop`.

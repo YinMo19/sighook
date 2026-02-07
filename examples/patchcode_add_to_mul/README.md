@@ -1,9 +1,9 @@
 # patchcode_add_to_mul
 
-Demonstrates `sighook::patchcode` by replacing one instruction in `calc`:
+Demonstrates `sighook::patchcode` by replacing one instruction in `calc`.
 
-- original: `add w0, w8, w9`
-- patched: `mul w0, w8, w9`
+- `aarch64`: `add w0, w8, w9` -> `mul w0, w8, w9`
+- `linux x86_64`: `add eax, edx` (+ nops) -> `imul eax, edx` (+ nop)
 
 ## Run (from repository root)
 

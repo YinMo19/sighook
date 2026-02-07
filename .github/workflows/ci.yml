@@ -64,7 +64,6 @@ jobs:
           [[ "$OUT" == *"calc(6, 7) = 42"* ]]
 
   rust-linux-x86_64:
-    if: startsWith(github.ref_name, 'linux') || startsWith(github.head_ref, 'linux')
     runs-on: ubuntu-24.04
 
     steps:
@@ -94,11 +93,29 @@ jobs:
         run: |
           set -euo pipefail
 
+          cc -O0 -fno-inline -rdynamic examples/instrument_with_original/target.c -o examples/instrument_with_original/app
+          SO="$PWD/target/x86_64-unknown-linux-gnu/debug/examples/libinstrument_with_original.so"
+          OUT=$(LD_PRELOAD="$SO" examples/instrument_with_original/app)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(1, 2) = 42"* ]]
+
+          cc -O0 -fno-inline -rdynamic examples/instrument_no_original/target.c -o examples/instrument_no_original/app
+          SO="$PWD/target/x86_64-unknown-linux-gnu/debug/examples/libinstrument_no_original.so"
+          OUT=$(LD_PRELOAD="$SO" examples/instrument_no_original/app)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(4, 5) = 99"* ]]
+
           cc -O0 -fno-inline -rdynamic examples/inline_hook_far/target.c -o examples/inline_hook_far/app
           SO="$PWD/target/x86_64-unknown-linux-gnu/debug/examples/libinline_hook_far.so"
           OUT=$(LD_PRELOAD="$SO" examples/inline_hook_far/app)
           echo "$OUT"
           [[ "$OUT" == *"target_add(6, 7) = 42"* ]]
+
+          cc -O0 -fno-inline -rdynamic examples/patchcode_add_to_mul/target.c -o examples/patchcode_add_to_mul/app
+          SO="$PWD/target/x86_64-unknown-linux-gnu/debug/examples/libpatchcode_add_to_mul.so"
+          OUT=$(LD_PRELOAD="$SO" examples/patchcode_add_to_mul/app)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(6, 7) = 42"* ]]
 
   rust-linux-aarch64:
     if: startsWith(github.ref_name, 'linux') || startsWith(github.head_ref, 'linux')
