@@ -14,24 +14,25 @@ It is designed for low-level experimentation, reverse engineering, and custom ru
 
 ## Features
 
-- `patchcode(address, opcode)` for raw 32-bit instruction patching
+- `patchcode(address, opcode)` for raw instruction patching
 - `instrument(address, callback)` to trap and then execute original opcode
 - `instrument_no_original(address, callback)` to trap and skip original opcode
 - `inline_hook(addr, replace_fn)` with automatic far-jump fallback
 - zero-copy context remap (`HookContext`) in callbacks
 - architecture-specific callback context (`aarch64` and `x86_64` layouts)
 
-## Platform
+## Platform Support
 
-- macOS on Apple Silicon (`aarch64`)
-- Linux (`aarch64`, `x86_64`)
+- `aarch64-apple-darwin`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
+- `aarch64-unknown-linux-gnu`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
+- `x86_64-unknown-linux-gnu`: `instrument` / `instrument_no_original` / `inline_hook` runtime validated in CI; `patchcode` remains raw-opcode oriented and needs architecture-correct opcode input
 - single-thread model (`static mut` internal state)
 
 ## Installation
 
 ```toml
 [dependencies]
-sighook = "0.2"
+sighook = "0.3"
 ```
 
 ## Quick Start
@@ -76,6 +77,19 @@ let replacement_addr = replacement as usize as u64;
 let _original = inline_hook(function_entry, replacement_addr)?;
 # Ok::<(), sighook::SigHookError>(())
 ```
+
+## Example Loading Model
+
+The examples are `cdylib` payloads that auto-run hook install logic via constructor sections:
+
+- macOS uses `__DATA,__mod_init_func` + `DYLD_INSERT_LIBRARIES`
+- Linux uses `.init_array` + `LD_PRELOAD`
+
+When your preload library resolves symbols from the target executable via `dlsym`, compile the target executable with `-rdynamic` on Linux.
+
+## Linux AArch64 Patchpoint Note
+
+For AArch64 Linux examples, `calc`-based demos export a dedicated `calc_add_insn` symbol and patch that symbol directly. This avoids brittle fixed-offset assumptions in toolchain-generated function layout.
 
 ## API Notes
 
