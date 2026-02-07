@@ -2,12 +2,10 @@
 
 Demonstrates `sighook::instrument`.
 
-The callback updates registers before original opcode executes:
+The callback updates context before original opcode executes:
 
-- `aarch64`: set `x8 = 40`, `x9 = 2`
-- `linux x86_64`: set `rdx = 40`, `rax = 2`
-
-Then original add instruction runs through trampoline.
+- `aarch64`: set `x8 = 40`, `x9 = 2`, then original `add w0, w8, w9` runs
+- `linux x86_64`: set `rax = 42`, then original `nop` runs at the patch point
 
 ## Run (from repository root)
 

@@ -27,12 +27,10 @@ __asm__(
     ".global calc_add_insn\n"
     ".type calc, @function\n"
     "calc:\n"
-    "  mov %edi, %edx\n"
-    "  mov %esi, %eax\n"
-    "  nop\n"
-    "  nop\n"
+    "  mov %edi, %eax\n"
+    "  add %esi, %eax\n"
     "calc_add_insn:\n"
-    "  add %edx, %eax\n"
+    "  nop\n"
     "  ret\n"
     ".size calc, .-calc\n");
 #elif defined(__aarch64__)

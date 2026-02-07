@@ -13,8 +13,7 @@ extern "C" fn on_hit(_address: u64, ctx: *mut HookContext) {
 
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         {
-            (*ctx).rdx = 40;
-            (*ctx).rax = 2;
+            (*ctx).rax = 42;
         }
     }
 }
