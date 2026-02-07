@@ -88,7 +88,7 @@ pub(crate) fn create_original_trampoline(
             }
             flush_icache(memory, original_bytes.len() + rel_jmp.len());
         } else {
-            let abs = crate::memory::encode_absolute_jump(next_pc);
+            let abs = encode_abs_jmp_indirect(next_pc);
             unsafe {
                 std::ptr::copy_nonoverlapping(abs.as_ptr(), jmp_site as *mut u8, abs.len());
             }
@@ -105,6 +105,19 @@ pub(crate) fn create_original_trampoline(
     }
 
     Ok(base as u64)
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+fn encode_abs_jmp_indirect(to_address: u64) -> [u8; 14] {
+    let mut bytes = [0u8; 14];
+    bytes[0] = 0xFF;
+    bytes[1] = 0x25;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6..14].copy_from_slice(&to_address.to_le_bytes());
+    bytes
 }
 
 fn flush_icache(start: *mut c_void, len: usize) {
