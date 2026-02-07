@@ -26,10 +26,10 @@ Available examples:
 ## Coverage matrix
 
 - `aarch64-apple-darwin`: `patchcode` / `instrument` / `instrument_no_original` / `inline_hook`
-- `aarch64-unknown-linux-gnu`: same API coverage; offsets/opcodes still need per-binary verification
+- `aarch64-unknown-linux-gnu`: runtime smoke coverage for all 4 examples (CI)
 - `x86_64-unknown-linux-gnu`: API compile coverage for all examples, runtime smoke coverage for `instrument*` and `inline_hook`; `patchcode_add_to_mul` remains AArch64-opcode specific demo
 
 ## Notes by architecture
 
-- On `aarch64`, examples currently use fixed instruction offsets from symbol entry and patch ARM64 opcodes.
+- On `aarch64`, `calc` examples use fixed asm layout so `ADD_INSN_OFFSET=0x14` and opcode patching remain stable across macOS/Linux CI.
 - On `x86_64`, examples compile for API smoke-check; runtime offsets/opcodes are architecture-specific and need per-binary recalculation before real testing.

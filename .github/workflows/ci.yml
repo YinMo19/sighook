@@ -154,3 +154,13 @@ jobs:
           OUT=$(LD_PRELOAD="$SO" examples/patchcode_add_to_mul/app)
           echo "$OUT"
           [[ "$OUT" == *"calc(6, 7) = 42"* ]]
+
+      - name: Verify aarch64 calc symbol layout
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cc -O0 -fno-inline -rdynamic examples/instrument_with_original/target.c -o examples/instrument_with_original/app
+          OBJ=$(objdump -d examples/instrument_with_original/app | sed -n '/<calc>:/,/ret/p')
+          echo "$OBJ"
+          echo "$OBJ" | grep -q "add\s\+w0, w8, w9"
