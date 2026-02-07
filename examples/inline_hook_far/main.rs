@@ -6,6 +6,7 @@ extern "C" fn replacement(a: i32, b: i32) -> i32 {
 
 #[used]
 #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,__mod_init_func"))]
+#[cfg_attr(target_os = "linux", unsafe(link_section = ".init_array"))]
 static INIT_ARRAY: extern "C" fn() = init;
 
 extern "C" fn init() {
