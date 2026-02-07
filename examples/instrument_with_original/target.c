@@ -19,20 +19,16 @@ __asm__(
     "  ret\n"
     ".size calc, .-calc\n");
 #elif defined(__linux__) && defined(__x86_64__)
-int calc(int a, int b);
+__asm__(".global calc_add_insn\n");
 
-__asm__(
-    ".text\n"
-    ".global calc\n"
-    ".global calc_add_insn\n"
-    ".type calc, @function\n"
-    "calc:\n"
-    "  mov %edi, %eax\n"
-    "  add %esi, %eax\n"
-    "calc_add_insn:\n"
-    "  nop\n"
-    "  ret\n"
-    ".size calc, .-calc\n");
+__attribute__((noinline))
+int calc(int a, int b) {
+    int sum = a + b;
+    __asm__ volatile(
+        "calc_add_insn:\n"
+        "  nop\n");
+    return sum;
+}
 #elif defined(__aarch64__)
 __attribute__((naked, noinline))
 int calc(int a, int b) {
