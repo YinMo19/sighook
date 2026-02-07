@@ -100,9 +100,9 @@ jobs:
           echo "$OUT"
           [[ "$OUT" == *"target_add(6, 7) = 42"* ]]
 
-  rust-linux-aarch64-check:
+  rust-linux-aarch64:
     if: startsWith(github.ref_name, 'linux') || startsWith(github.head_ref, 'linux')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
 
     steps:
       - name: Checkout
@@ -112,6 +112,45 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-unknown-linux-gnu
+          components: clippy
 
-      - name: Cargo check (lib only)
-        run: cargo check --lib --target aarch64-unknown-linux-gnu
+      - name: Cargo check
+        run: cargo check --all-targets --target aarch64-unknown-linux-gnu
+
+      - name: Cargo test
+        run: cargo test --doc --target aarch64-unknown-linux-gnu
+
+      - name: Cargo clippy
+        run: cargo clippy --all-targets --target aarch64-unknown-linux-gnu -- -D warnings
+
+      - name: Build all examples (Linux aarch64)
+        run: cargo build --examples --target aarch64-unknown-linux-gnu
+
+      - name: Run Linux aarch64 example smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cc -O0 -fno-inline -rdynamic examples/instrument_with_original/target.c -o examples/instrument_with_original/app
+          SO="$PWD/target/aarch64-unknown-linux-gnu/debug/examples/libinstrument_with_original.so"
+          OUT=$(LD_PRELOAD="$SO" examples/instrument_with_original/app)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(1, 2) = 42"* ]]
+
+          cc -O0 -fno-inline -rdynamic examples/instrument_no_original/target.c -o examples/instrument_no_original/app
+          SO="$PWD/target/aarch64-unknown-linux-gnu/debug/examples/libinstrument_no_original.so"
+          OUT=$(LD_PRELOAD="$SO" examples/instrument_no_original/app)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(4, 5) = 99"* ]]
+
+          cc -O0 -fno-inline -rdynamic examples/inline_hook_far/target.c -o examples/inline_hook_far/app
+          SO="$PWD/target/aarch64-unknown-linux-gnu/debug/examples/libinline_hook_far.so"
+          OUT=$(LD_PRELOAD="$SO" examples/inline_hook_far/app)
+          echo "$OUT"
+          [[ "$OUT" == *"target_add(6, 7) = 42"* ]]
+
+          cc -O0 -fno-inline -rdynamic examples/patchcode_add_to_mul/target.c -o examples/patchcode_add_to_mul/app
+          SO="$PWD/target/aarch64-unknown-linux-gnu/debug/examples/libpatchcode_add_to_mul.so"
+          OUT=$(LD_PRELOAD="$SO" examples/patchcode_add_to_mul/app)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(6, 7) = 42"* ]]
