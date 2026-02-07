@@ -58,7 +58,7 @@ fn install_signal(signum: c_int) -> Result<(), SigHookError> {
     unsafe {
         let mut act: libc::sigaction = zeroed();
         act.sa_flags = libc::SA_SIGINFO;
-        act.sa_sigaction = trap_handler as usize;
+        act.sa_sigaction = trap_handler as *const () as usize;
 
         if libc::sigemptyset(&mut act.sa_mask) != 0 {
             return Err(SigHookError::SigEmptySetFailed {
