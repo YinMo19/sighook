@@ -96,8 +96,8 @@ pub unsafe fn remap_ctx(_uc: *mut libc::ucontext_t) -> *mut HookContext {
 
     let ctx = HookContext {
         regs: XRegisters { x: regs },
-        sp: mcontext.sp as u64,
-        pc: mcontext.pc as u64,
+        sp: mcontext.sp,
+        pc: mcontext.pc,
         cpsr: mcontext.pstate as u32,
         pad: 0,
     };
