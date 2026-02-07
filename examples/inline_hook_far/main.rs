@@ -16,7 +16,7 @@ extern "C" fn init() {
         }
 
         let function_entry = symbol as u64;
-        let replacement_fn = replacement as usize as u64;
+        let replacement_fn = replacement as *const () as usize as u64;
         let _ = inline_hook(function_entry, replacement_fn);
     }
 }
