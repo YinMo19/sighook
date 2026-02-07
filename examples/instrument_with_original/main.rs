@@ -1,5 +1,6 @@
 use sighook::{HookContext, instrument};
 
+#[cfg(not(all(target_os = "linux", target_arch = "aarch64")))]
 const ADD_INSN_OFFSET: u64 = 0x14;
 
 extern "C" fn on_hit(_address: u64, ctx: *mut HookContext) {
@@ -25,12 +26,26 @@ static INIT_ARRAY: extern "C" fn() = init;
 
 extern "C" fn init() {
     unsafe {
-        let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"calc".as_ptr());
-        if symbol.is_null() {
-            return;
-        }
+        let target_address = {
+            #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+            {
+                let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"calc_add_insn".as_ptr());
+                if symbol.is_null() {
+                    return;
+                }
+                symbol as u64
+            }
 
-        let target_address = symbol as u64 + ADD_INSN_OFFSET;
+            #[cfg(not(all(target_os = "linux", target_arch = "aarch64")))]
+            {
+                let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"calc".as_ptr());
+                if symbol.is_null() {
+                    return;
+                }
+                symbol as u64 + ADD_INSN_OFFSET
+            }
+        };
+
         let _ = instrument(target_address, on_hit);
     }
 }
