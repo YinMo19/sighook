@@ -1,6 +1,6 @@
 [package]
 name = "sighook"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 rust-version = "1.85"
 authors = ["YinMo19 <me@yinmo19.top>"]
@@ -11,6 +11,11 @@ repository = "https://github.com/YinMo19"
 homepage = "https://blog.yinmo19.top"
 documentation = "https://docs.rs/sighook"
 keywords = ["macos", "aarch64", "hook", "instrumentation", "signal"]
+
+[package.metadata.docs.rs]
+default-target = "aarch64-apple-darwin"
+targets = ["aarch64-apple-darwin"]
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 name = "sighook"
