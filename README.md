@@ -1,5 +1,10 @@
 # sighook
 
+[![crates.io](https://img.shields.io/crates/v/sighook.svg)](https://crates.io/crates/sighook)
+[![docs.rs](https://docs.rs/sighook/badge.svg)](https://docs.rs/sighook)
+[![CI](https://github.com/YinMo19/sighook/actions/workflows/ci.yml/badge.svg)](https://github.com/YinMo19/sighook/actions/workflows/ci.yml)
+[![license](https://img.shields.io/crates/l/sighook.svg)](https://spdx.org/licenses/GPL-2.0-only.html)
+
 `Sighook` is a macOS (`aarch64`) runtime patching crate focused on:
 
 - instruction-level instrumentation via `BRK + signal handler`

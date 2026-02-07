@@ -1,6 +1,6 @@
 [package]
 name = "sighook"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["YinMo19 <me@yinmo19.top>"]
@@ -15,6 +15,26 @@ keywords = ["macos", "aarch64", "hook", "instrumentation", "signal"]
 [lib]
 name = "sighook"
 crate-type = ["rlib", "cdylib"]
+
+[[example]]
+name = "patchcode_add_to_mul"
+path = "examples/patchcode_add_to_mul/main.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "instrument_with_original"
+path = "examples/instrument_with_original/main.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "instrument_no_original"
+path = "examples/instrument_no_original/main.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "inline_hook_far"
+path = "examples/inline_hook_far/main.rs"
+crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2"
