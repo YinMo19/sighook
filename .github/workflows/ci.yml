@@ -118,7 +118,6 @@ jobs:
           [[ "$OUT" == *"calc(6, 7) = 42"* ]]
 
   rust-linux-aarch64:
-    if: startsWith(github.ref_name, 'linux') || startsWith(github.head_ref, 'linux')
     runs-on: ubuntu-24.04-arm
 
     steps:

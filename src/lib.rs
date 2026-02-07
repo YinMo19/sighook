@@ -22,20 +22,97 @@ pub use context::{HookContext, InstrumentCallback};
 pub use context::{HookContext, InstrumentCallback, XRegisters, XRegistersNamed};
 pub use error::SigHookError;
 
+/// Replaces one machine instruction at `address` with `new_opcode`.
+///
+/// The function writes 4 bytes and returns the previously stored 4-byte value.
+/// Use this API when you already know the exact opcode encoding for your target architecture.
+///
+/// - On `aarch64`, `new_opcode` is a 32-bit ARM instruction word.
+/// - On Linux `x86_64`, `new_opcode` is written as 4 little-endian bytes.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use sighook::patchcode;
+///
+/// let address = 0x1000_0000u64;
+/// let old = patchcode(address, 0xD420_0000)?;
+/// let _ = old;
+/// # Ok::<(), sighook::SigHookError>(())
+/// ```
 #[cfg(target_arch = "aarch64")]
 pub fn patchcode(address: u64, new_opcode: u32) -> Result<u32, SigHookError> {
     memory::patch_u32(address, new_opcode)
 }
 
+/// Replaces one machine instruction at `address` with `new_opcode`.
+///
+/// The function writes 4 bytes and returns the previously stored 4-byte value.
+/// Use this API when you already know the exact opcode encoding for your target architecture.
+///
+/// - On `aarch64`, `new_opcode` is a 32-bit ARM instruction word.
+/// - On Linux `x86_64`, `new_opcode` is written as 4 little-endian bytes.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use sighook::patchcode;
+///
+/// let address = 0x7FFF_0000_0000u64;
+/// let old = patchcode(address, 0x90C3_9090)?;
+/// let _ = old;
+/// # Ok::<(), sighook::SigHookError>(())
+/// ```
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub fn patchcode(address: u64, new_opcode: u32) -> Result<u32, SigHookError> {
     memory::patch_u32(address, new_opcode)
 }
 
+/// Installs an instruction-level hook and executes the original instruction afterward.
+///
+/// This API patches the target instruction with a trap opcode and registers `callback`.
+/// On trap, your callback receives a mutable [`HookContext`].
+/// If the callback does not redirect control flow (`pc`/`rip` unchanged),
+/// the original instruction runs through an internal trampoline, then execution continues.
+///
+/// Returns the original 4-byte value previously stored at `address`.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use sighook::{instrument, HookContext};
+///
+/// extern "C" fn on_hit(_address: u64, _ctx: *mut HookContext) {}
+///
+/// let target = 0x1000_0000u64;
+/// let original = instrument(target, on_hit)?;
+/// let _ = original;
+/// # Ok::<(), sighook::SigHookError>(())
+/// ```
 pub fn instrument(address: u64, callback: InstrumentCallback) -> Result<u32, SigHookError> {
     instrument_internal(address, callback, true)
 }
 
+/// Installs an instruction-level hook and skips the original instruction by default.
+///
+/// This behaves like [`instrument`] except `execute_original = false`.
+/// After your callback returns, execution advances past the patched instruction
+/// unless the callback explicitly changes control flow (`pc`/`rip`).
+///
+/// Returns the original 4-byte value previously stored at `address`.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use sighook::{instrument_no_original, HookContext};
+///
+/// extern "C" fn replace_logic(_address: u64, _ctx: *mut HookContext) {}
+///
+/// let target = 0x1000_0010u64;
+/// let original = instrument_no_original(target, replace_logic)?;
+/// let _ = original;
+/// # Ok::<(), sighook::SigHookError>(())
+/// ```
 pub fn instrument_no_original(
     address: u64,
     callback: InstrumentCallback,
@@ -92,6 +169,27 @@ fn instrument_internal(
     }
 }
 
+/// Detours a function entry to `replace_fn` with inline patching.
+///
+/// Strategy:
+/// - Try near jump first (short encoding).
+/// - Fall back to architecture-specific far jump sequence when out of range.
+///
+/// Returns the first 4 bytes of original instruction bytes at `addr`.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use sighook::inline_hook;
+///
+/// extern "C" fn replacement() {}
+///
+/// let function_entry = 0x1000_1000u64;
+/// let replacement_addr = replacement as usize as u64;
+/// let original = inline_hook(function_entry, replacement_addr)?;
+/// let _ = original;
+/// # Ok::<(), sighook::SigHookError>(())
+/// ```
 pub fn inline_hook(addr: u64, replace_fn: u64) -> Result<u32, SigHookError> {
     #[cfg(target_arch = "aarch64")]
     {
@@ -125,6 +223,24 @@ pub fn inline_hook(addr: u64, replace_fn: u64) -> Result<u32, SigHookError> {
     }
 }
 
+/// Returns the saved original 4-byte value for a previously patched address.
+///
+/// The value is available after a successful call to [`patchcode`], [`instrument`],
+/// [`instrument_no_original`], or [`inline_hook`] on the same address.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use sighook::{instrument, original_opcode, HookContext};
+///
+/// extern "C" fn on_hit(_address: u64, _ctx: *mut HookContext) {}
+///
+/// let addr = 0x1000_2000u64;
+/// let _ = instrument(addr, on_hit)?;
+/// let maybe_old = original_opcode(addr);
+/// let _ = maybe_old;
+/// # Ok::<(), sighook::SigHookError>(())
+/// ```
 pub fn original_opcode(address: u64) -> Option<u32> {
     unsafe { state::original_opcode_by_address(address) }
 }

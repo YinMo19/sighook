@@ -1,0 +1,113 @@
+# sighook Agent Notes
+
+Last updated: 2026-02-07
+
+## 1) Current Project Snapshot
+
+- Crate: `sighook`
+- Current version: `0.3.1`
+- Status: multi-platform runtime hook crate with published Linux + macOS support.
+- Current architecture focus: platform-specific backend code behind stable public API.
+
+### Public APIs (stable signatures)
+
+- `patchcode(address, new_opcode) -> Result<u32, SigHookError>`
+- `instrument(address, callback) -> Result<u32, SigHookError>`
+- `instrument_no_original(address, callback) -> Result<u32, SigHookError>`
+- `inline_hook(addr, replace_fn) -> Result<u32, SigHookError>`
+- `original_opcode(address) -> Option<u32>`
+
+### Callback contract
+
+- Callback signature is fixed:
+  `extern "C" fn(address: u64, ctx: *mut HookContext)`
+- Callback may mutate registers/PC in-place through `HookContext`.
+- `instrument`: callback + original instruction trampoline.
+- `instrument_no_original`: callback + skip original instruction (unless callback updates control flow).
+
+## 2) Supported Platforms and Runtime Status
+
+### Fully supported targets
+
+- `aarch64-apple-darwin`
+- `aarch64-unknown-linux-gnu`
+- `x86_64-unknown-linux-gnu`
+
+### CI jobs (always-on for active matrix)
+
+- `rust-macos-aarch64`: fmt/check/doc-test/clippy + 4 example smoke tests.
+- `rust-linux-x86_64`: check/doc-test/clippy + 4 example smoke tests.
+- `rust-linux-aarch64`: check/doc-test/clippy + 4 example smoke tests.
+
+### Example smoke outputs expected in CI
+
+- `instrument_with_original`: `calc(1, 2) = 42`
+- `instrument_no_original`: `calc(4, 5) = 99`
+- `inline_hook_far`: `target_add(6, 7) = 42`
+- `patchcode_add_to_mul`: `calc(6, 7) = 42`
+
+## 3) Internal Architecture (Important)
+
+### Module responsibilities
+
+- `src/lib.rs`: stable API surface and platform-gated exports.
+- `src/signal.rs`: signal handlers and trap dispatch flow.
+- `src/context.rs`: `ucontext`/thread-state remap to `HookContext`.
+- `src/memory.rs`: patching, page permission management, branch encoding.
+- `src/trampoline.rs`: original instruction trampoline generation.
+- `src/state.rs`: global slot registry + original bytes/opcode cache.
+
+### Runtime model assumptions
+
+- Single-thread model by design (`static mut` global state).
+- Fixed instrument slot array (no dynamic allocator-based slot registry).
+- No locking primitives in hot path.
+
+## 4) Platform-specific Decisions (Keep these)
+
+### Linux AArch64 examples
+
+- Use explicit patchpoint symbol `calc_add_insn` for `calc` examples.
+- Do **not** rely on compiler-layout fixed offsets for Linux AArch64.
+
+### Linux x86_64 examples
+
+- `instrument*` examples use deterministic assembly layout + fixed patch offset (`+0x4` from `calc`).
+- `patchcode_add_to_mul` uses deterministic assembly layout + fixed patch offset (`+0x6` from `calc`).
+- Linux builds use `-rdynamic` in example smoke scripts so `dlsym` on executable symbols remains reliable.
+
+### x86_64 trampoline critical fix
+
+- Absolute jump fallback in trampoline must not clobber return register.
+- Current implementation uses RIP-indirect `jmp qword ptr [rip]` with inline 64-bit target literal to preserve `rax` semantics.
+
+## 5) Documentation State
+
+- Public APIs in `src/lib.rs` now include English rustdoc with concise behavior notes and minimal `no_run` examples.
+- Goal: hovering functions in IDE should show direct usage without leaving source.
+
+## 6) Validation Checklist
+
+Run before release/tag:
+
+```bash
+cargo fmt --all -- --check
+cargo check --all-targets
+cargo test --doc
+cargo clippy --all-targets -- -D warnings
+cargo check --all-targets --target aarch64-apple-darwin
+cargo check --all-targets --target x86_64-unknown-linux-gnu
+```
+
+If local toolchain supports it, also run:
+
+```bash
+cargo check --all-targets --target aarch64-unknown-linux-gnu
+cargo clippy --all-targets --target aarch64-unknown-linux-gnu -- -D warnings
+```
+
+## 7) Near-term Next Steps
+
+- Android support (AArch64 first): signal/context backend split and loader model decisions.
+- iOS support: constructor/init flow parity, signal/exception constraints, code-sign/protection constraints.
+- Optional: introduce a lightweight backend trait to reduce cfg branching in `lib.rs` and simplify future ports.
