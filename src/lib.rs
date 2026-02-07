@@ -1,7 +1,12 @@
-#![cfg(target_os = "macos")]
-#![cfg(target_arch = "aarch64")]
 #![allow(deprecated)]
 #![doc = include_str!("../README.md")]
+
+#[cfg(not(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+)))]
+compile_error!("sighook only supports macOS aarch64, Linux aarch64, and Linux x86_64.");
 
 mod constants;
 mod context;
@@ -11,85 +16,26 @@ mod signal;
 mod state;
 mod trampoline;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub use context::{HookContext, InstrumentCallback};
+#[cfg(target_arch = "aarch64")]
 pub use context::{HookContext, InstrumentCallback, XRegisters, XRegistersNamed};
 pub use error::SigHookError;
 
-/// Patches one 32-bit instruction at `address`.
-///
-/// # Parameters
-/// - `address`: Runtime virtual address of the instruction.
-/// - `new_opcode`: AArch64 instruction word to write.
-///
-/// # Returns
-/// Returns the original opcode.
-///
-/// # Examples
-/// ```rust,no_run
-/// use sighook::patchcode;
-///
-/// let address = 0x1000_0000_u64;
-/// let brk = 0xD420_0000_u32;
-/// let _original = patchcode(address, brk)?;
-/// # Ok::<(), sighook::SigHookError>(())
-/// ```
+#[cfg(target_arch = "aarch64")]
 pub fn patchcode(address: u64, new_opcode: u32) -> Result<u32, SigHookError> {
     memory::patch_u32(address, new_opcode)
 }
 
-/// Installs BRK-based instrumentation that executes the original instruction.
-///
-/// The target instruction is replaced with `brk #0`. On trap, callback receives
-/// `(address, ctx)`, then the library resumes via an internal trampoline that
-/// runs the original opcode and jumps back to `address + 4`.
-///
-/// # Parameters
-/// - `address`: Runtime virtual address of the target instruction.
-/// - `callback`: User callback for register/context edits.
-///
-/// # Returns
-/// Returns the original opcode at `address`.
-///
-/// # Examples
-/// ```rust,no_run
-/// use sighook::{instrument, HookContext};
-///
-/// extern "C" fn on_hit(_address: u64, ctx: *mut HookContext) {
-///     unsafe {
-///         (*ctx).pc = (*ctx).pc.wrapping_add(0);
-///     }
-/// }
-///
-/// let address = 0x1000_0000_u64;
-/// let _original = instrument(address, on_hit)?;
-/// # Ok::<(), sighook::SigHookError>(())
-/// ```
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub fn patchcode(address: u64, new_opcode: u32) -> Result<u32, SigHookError> {
+    memory::patch_u32(address, new_opcode)
+}
+
 pub fn instrument(address: u64, callback: InstrumentCallback) -> Result<u32, SigHookError> {
     instrument_internal(address, callback, true)
 }
 
-/// Installs BRK-based instrumentation that does not execute original opcode.
-///
-/// The target instruction is replaced with `brk #0`. On trap, callback receives
-/// `(address, ctx)`. If callback keeps `ctx.pc` unchanged, the library advances
-/// to `address + 4` directly.
-///
-/// # Parameters
-/// - `address`: Runtime virtual address of the target instruction.
-/// - `callback`: User callback for custom replacement logic.
-///
-/// # Returns
-/// Returns the original opcode at `address`.
-///
-/// # Examples
-/// ```rust,no_run
-/// use sighook::{instrument_no_original, HookContext};
-///
-/// extern "C" fn replace_logic(_address: u64, _ctx: *mut HookContext) {}
-///
-/// let address = 0x1000_0010_u64;
-/// let _original = instrument_no_original(address, replace_logic)?;
-/// # Ok::<(), sighook::SigHookError>(())
-/// ```
 pub fn instrument_no_original(
     address: u64,
     callback: InstrumentCallback,
@@ -103,65 +49,82 @@ fn instrument_internal(
     execute_original: bool,
 ) -> Result<u32, SigHookError> {
     unsafe {
-        if let Some(original) = state::original_opcode_by_address(address) {
-            state::register_slot(address, original, callback, execute_original)?;
-            return Ok(original);
+        if let Some((bytes, len)) = state::original_bytes_by_address(address) {
+            state::register_slot(
+                address,
+                &bytes[..len as usize],
+                len,
+                callback,
+                execute_original,
+            )?;
+            return state::original_opcode_by_address(address).ok_or(SigHookError::InvalidAddress);
         }
 
         signal::ensure_handlers_installed()?;
 
-        let original = patchcode(address, constants::BRK_OPCODE)?;
-        state::register_slot(address, original, callback, execute_original)?;
-        Ok(original)
+        #[cfg(target_arch = "aarch64")]
+        let step_len: u8 = memory::instruction_width();
+
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        let step_len: u8 = memory::instruction_width_at(address)?;
+
+        #[cfg(target_arch = "aarch64")]
+        let original_bytes = {
+            let original = memory::patch_u32(address, constants::BRK_OPCODE)?;
+            original.to_le_bytes().to_vec()
+        };
+
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        let original_bytes = {
+            let original_bytes = memory::read_bytes(address, step_len as usize)?;
+            let _ = memory::patch_u8(address, memory::int3_opcode())?;
+            original_bytes
+        };
+
+        state::register_slot(
+            address,
+            &original_bytes,
+            step_len,
+            callback,
+            execute_original,
+        )?;
+        state::original_opcode_by_address(address).ok_or(SigHookError::InvalidAddress)
     }
 }
 
-/// Installs an inline function-entry hook.
-///
-/// The library first tries a direct `b replace_fn`. If target is out of direct
-/// branch range, it falls back to a far jump stub at function entry:
-/// `ldr x16, #8; br x16; .quad replace_fn`.
-///
-/// The detour uses `b` (not `bl`), so `replace_fn` returns to the original
-/// caller using the caller-provided `lr`.
-///
-/// # Parameters
-/// - `addr`: Runtime virtual address of function entry.
-/// - `replace_fn`: Runtime virtual address of replacement function.
-///
-/// # Returns
-/// Returns the original first opcode at `addr`.
-///
-/// # Examples
-/// ```rust,no_run
-/// use sighook::inline_hook;
-///
-/// extern "C" fn replacement() {}
-///
-/// let target = 0x1000_1000_u64;
-/// let detour = replacement as usize as u64;
-/// let _original = inline_hook(target, detour)?;
-/// # Ok::<(), sighook::SigHookError>(())
-/// ```
 pub fn inline_hook(addr: u64, replace_fn: u64) -> Result<u32, SigHookError> {
-    match memory::encode_b(addr, replace_fn) {
-        Ok(b_opcode) => patchcode(addr, b_opcode),
-        Err(SigHookError::BranchOutOfRange) => memory::patch_far_jump(addr, replace_fn),
-        Err(err) => Err(err),
+    #[cfg(target_arch = "aarch64")]
+    {
+        match memory::encode_b(addr, replace_fn) {
+            Ok(b_opcode) => patchcode(addr, b_opcode),
+            Err(SigHookError::BranchOutOfRange) => memory::patch_far_jump(addr, replace_fn),
+            Err(err) => Err(err),
+        }
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        if let Ok(jmp) = memory::encode_jmp_rel32(addr, replace_fn) {
+            let original = memory::patch_bytes_public(addr, &jmp)?;
+            let mut opcode = [0u8; 4];
+            if original.len() >= 4 {
+                opcode.copy_from_slice(&original[..4]);
+                return Ok(u32::from_le_bytes(opcode));
+            }
+            return Err(SigHookError::InvalidAddress);
+        }
+
+        let abs = memory::encode_absolute_jump(replace_fn);
+        let original = memory::patch_bytes_public(addr, &abs)?;
+        let mut opcode = [0u8; 4];
+        if original.len() >= 4 {
+            opcode.copy_from_slice(&original[..4]);
+            return Ok(u32::from_le_bytes(opcode));
+        }
+        Err(SigHookError::InvalidAddress)
     }
 }
 
-/// Returns saved original opcode for an instrumented address.
-///
-/// Returns `None` if the address is not registered.
-///
-/// # Examples
-/// ```rust,no_run
-/// use sighook::original_opcode;
-///
-/// let address = 0x1000_0000_u64;
-/// let _maybe_opcode = original_opcode(address);
-/// ```
 pub fn original_opcode(address: u64) -> Option<u32> {
     unsafe { state::original_opcode_by_address(address) }
 }

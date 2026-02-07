@@ -5,32 +5,34 @@
 [![CI](https://github.com/YinMo19/sighook/actions/workflows/ci.yml/badge.svg)](https://github.com/YinMo19/sighook/actions/workflows/ci.yml)
 [![license](https://img.shields.io/crates/l/sighook.svg)](https://spdx.org/licenses/GPL-2.0-only.html)
 
-`Sighook` is a macOS (`aarch64`) runtime patching crate focused on:
+`Sighook` is a runtime patching crate focused on:
 
-- instruction-level instrumentation via `BRK + signal handler`
+- instruction-level instrumentation via trap instruction + signal handler
 - function-entry inline detours (near and far jump)
 
 It is designed for low-level experimentation, reverse engineering, and custom runtime instrumentation workflows.
 
 ## Features
 
-- `patchcode(address, opcode)` for raw 32-bit instruction patching
+- `patchcode(address, opcode)` for raw instruction patching
 - `instrument(address, callback)` to trap and then execute original opcode
 - `instrument_no_original(address, callback)` to trap and skip original opcode
 - `inline_hook(addr, replace_fn)` with automatic far-jump fallback
 - zero-copy context remap (`HookContext`) in callbacks
-- register union access: `ctx.regs.x[i]` and `ctx.regs.named.xN`
+- architecture-specific callback context (`aarch64` and `x86_64` layouts)
 
-## Platform
+## Platform Support
 
-- macOS on Apple Silicon (`aarch64`)
+- `aarch64-apple-darwin`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
+- `aarch64-unknown-linux-gnu`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
+- `x86_64-unknown-linux-gnu`: `instrument` / `instrument_no_original` / `inline_hook` runtime validated in CI; `patchcode` remains raw-opcode oriented and needs architecture-correct opcode input
 - single-thread model (`static mut` internal state)
 
 ## Installation
 
 ```toml
 [dependencies]
-sighook = "0.1"
+sighook = "0.3"
 ```
 
 ## Quick Start
@@ -41,10 +43,7 @@ sighook = "0.1"
 use sighook::{instrument, HookContext};
 
 extern "C" fn on_hit(_address: u64, ctx: *mut HookContext) {
-    unsafe {
-        // Example: touch a register before original opcode executes.
-        (*ctx).regs.named.x0 = (*ctx).regs.named.x0.wrapping_add(1);
-    }
+    let _ = ctx;
 }
 
 let target_instruction = 0x1000_0000_u64;
@@ -58,10 +57,7 @@ let _original = instrument(target_instruction, on_hit)?;
 use sighook::{instrument_no_original, HookContext};
 
 extern "C" fn replace_logic(_address: u64, ctx: *mut HookContext) {
-    unsafe {
-        // Example: fully replace behavior by editing result register directly.
-        (*ctx).regs.named.x0 = 0x1234;
-    }
+    let _ = ctx;
 }
 
 let target_instruction = 0x1000_0010_u64;
@@ -82,12 +78,24 @@ let _original = inline_hook(function_entry, replacement_addr)?;
 # Ok::<(), sighook::SigHookError>(())
 ```
 
+## Example Loading Model
+
+The examples are `cdylib` payloads that auto-run hook install logic via constructor sections:
+
+- macOS uses `__DATA,__mod_init_func` + `DYLD_INSERT_LIBRARIES`
+- Linux uses `.init_array` + `LD_PRELOAD`
+
+When your preload library resolves symbols from the target executable via `dlsym`, compile the target executable with `-rdynamic` on Linux.
+
+## Linux AArch64 Patchpoint Note
+
+For AArch64 Linux examples, `calc`-based demos export a dedicated `calc_add_insn` symbol and patch that symbol directly. This avoids brittle fixed-offset assumptions in toolchain-generated function layout.
+
 ## API Notes
 
-- `instrument(...)` executes original opcode through an internal trampoline.
-- `instrument_no_original(...)` skips original opcode unless callback changes `ctx.pc`.
-- `inline_hook(...)` first tries direct `b`; if out of range, it patches a far-jump stub.
-- `inline_hook(...)` uses `b` (not `bl`), so replacement returns to original caller via `lr`.
+- `instrument(...)` executes original instruction through an internal trampoline.
+- `instrument_no_original(...)` skips original instruction unless callback changes control-flow register (`pc`/`rip`).
+- `inline_hook(...)` uses architecture-specific near jump first, then far-jump fallback.
 
 ## Safety Notes
 

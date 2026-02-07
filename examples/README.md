@@ -2,6 +2,12 @@
 
 Each subdirectory demonstrates one `sighook` API as a Cargo example target.
 
+Current supported host targets:
+
+- `aarch64-apple-darwin`
+- `aarch64-unknown-linux-gnu`
+- `x86_64-unknown-linux-gnu`
+
 Build all examples from repository root:
 
 ```bash
@@ -16,3 +22,15 @@ Available examples:
 - `instrument_with_original`: BRK instrumentation + execute original opcode
 - `instrument_no_original`: BRK instrumentation + skip original opcode
 - `inline_hook_far`: function-entry detour with inline hook
+
+## Coverage matrix
+
+- `aarch64-apple-darwin`: `patchcode` / `instrument` / `instrument_no_original` / `inline_hook`
+- `aarch64-unknown-linux-gnu`: runtime smoke coverage for all 4 examples (CI)
+- `x86_64-unknown-linux-gnu`: API compile coverage for all examples; runtime smoke coverage for `inline_hook_far` in CI. `patchcode_add_to_mul` remains AArch64-opcode specific demo
+
+## Notes by architecture
+
+- On `aarch64-unknown-linux-gnu`, `calc` examples expose a dedicated `calc_add_insn` symbol and resolve patch point by symbol (no fixed offset dependency).
+- On `aarch64-apple-darwin`, `calc` examples keep fixed `ADD_INSN_OFFSET=0x14` for the naked function layout.
+- On `x86_64`, examples compile for API smoke-check; runtime offsets/opcodes are architecture-specific and need per-binary recalculation before real testing.

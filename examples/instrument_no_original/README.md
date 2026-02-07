@@ -6,10 +6,20 @@ The callback writes `x0 = 99`, and original opcode is skipped.
 
 ## Run (from repository root)
 
+macOS:
+
 ```bash
 cc -O0 -fno-inline examples/instrument_no_original/target.c -o examples/instrument_no_original/app
 cargo build --example instrument_no_original
 DYLD_INSERT_LIBRARIES="$PWD/target/debug/examples/libinstrument_no_original.dylib" examples/instrument_no_original/app
+```
+
+Linux:
+
+```bash
+cc -O0 -fno-inline -rdynamic examples/instrument_no_original/target.c -o examples/instrument_no_original/app
+cargo build --example instrument_no_original
+LD_PRELOAD="$PWD/target/debug/examples/libinstrument_no_original.so" examples/instrument_no_original/app
 ```
 
 Expected output:

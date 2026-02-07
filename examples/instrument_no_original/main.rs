@@ -1,10 +1,19 @@
 use sighook::{HookContext, instrument_no_original};
 
+#[cfg(not(all(target_os = "linux", target_arch = "aarch64")))]
 const ADD_INSN_OFFSET: u64 = 0x14;
 
 extern "C" fn replace_logic(_address: u64, ctx: *mut HookContext) {
     unsafe {
-        (*ctx).regs.named.x0 = 99;
+        #[cfg(target_arch = "aarch64")]
+        {
+            (*ctx).regs.named.x0 = 99;
+        }
+
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        {
+            (*ctx).rax = 99;
+        }
     }
 }
 
@@ -15,12 +24,26 @@ static INIT_ARRAY: extern "C" fn() = init;
 
 extern "C" fn init() {
     unsafe {
-        let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"calc".as_ptr());
-        if symbol.is_null() {
-            return;
-        }
+        let target_address = {
+            #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+            {
+                let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"calc_add_insn".as_ptr());
+                if symbol.is_null() {
+                    return;
+                }
+                symbol as u64
+            }
 
-        let target_address = symbol as u64 + ADD_INSN_OFFSET;
+            #[cfg(not(all(target_os = "linux", target_arch = "aarch64")))]
+            {
+                let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"calc".as_ptr());
+                if symbol.is_null() {
+                    return;
+                }
+                symbol as u64 + ADD_INSN_OFFSET
+            }
+        };
+
         let _ = instrument_no_original(target_address, replace_logic);
     }
 }
