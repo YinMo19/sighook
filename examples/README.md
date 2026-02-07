@@ -33,4 +33,4 @@ Available examples:
 
 - On `aarch64-unknown-linux-gnu`, `calc` examples expose a dedicated `calc_add_insn` symbol and resolve patch point by symbol (no fixed offset dependency).
 - On `aarch64-apple-darwin`, `calc` examples keep fixed `ADD_INSN_OFFSET=0x14` for the naked function layout.
-- On `x86_64-unknown-linux-gnu`, `calc` examples also use `calc_add_insn` symbol patchpoint. `patchcode_add_to_mul` patches `add eax, edx; nop; nop` into `imul eax, edx; nop`.
+- On `x86_64-unknown-linux-gnu`, `calc` examples use fixed offsets in dedicated assembly stubs (`instrument*`: `+0x4`, `patchcode_add_to_mul`: `+0x6`). `patchcode_add_to_mul` patches `add eax, edx; nop; nop` into `imul eax, edx; nop`.
