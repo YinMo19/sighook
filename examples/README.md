@@ -2,6 +2,12 @@
 
 Each subdirectory demonstrates one `sighook` API as a Cargo example target.
 
+Current supported host targets:
+
+- `aarch64-apple-darwin`
+- `aarch64-unknown-linux-gnu`
+- `x86_64-unknown-linux-gnu`
+
 Build all examples from repository root:
 
 ```bash
@@ -16,3 +22,14 @@ Available examples:
 - `instrument_with_original`: BRK instrumentation + execute original opcode
 - `instrument_no_original`: BRK instrumentation + skip original opcode
 - `inline_hook_far`: function-entry detour with inline hook
+
+## Coverage matrix
+
+- `aarch64-apple-darwin`: `patchcode` / `instrument` / `instrument_no_original` / `inline_hook`
+- `aarch64-unknown-linux-gnu`: same API coverage; offsets/opcodes still need per-binary verification
+- `x86_64-unknown-linux-gnu`: API compile coverage for all examples, runtime smoke coverage for `instrument*` and `inline_hook`; `patchcode_add_to_mul` remains AArch64-opcode specific demo
+
+## Notes by architecture
+
+- On `aarch64`, examples currently use fixed instruction offsets from symbol entry and patch ARM64 opcodes.
+- On `x86_64`, examples compile for API smoke-check; runtime offsets/opcodes are architecture-specific and need per-binary recalculation before real testing.

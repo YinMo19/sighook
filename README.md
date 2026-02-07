@@ -5,9 +5,9 @@
 [![CI](https://github.com/YinMo19/sighook/actions/workflows/ci.yml/badge.svg)](https://github.com/YinMo19/sighook/actions/workflows/ci.yml)
 [![license](https://img.shields.io/crates/l/sighook.svg)](https://spdx.org/licenses/GPL-2.0-only.html)
 
-`Sighook` is a macOS (`aarch64`) runtime patching crate focused on:
+`Sighook` is a runtime patching crate focused on:
 
-- instruction-level instrumentation via `BRK + signal handler`
+- instruction-level instrumentation via trap instruction + signal handler
 - function-entry inline detours (near and far jump)
 
 It is designed for low-level experimentation, reverse engineering, and custom runtime instrumentation workflows.
@@ -19,18 +19,19 @@ It is designed for low-level experimentation, reverse engineering, and custom ru
 - `instrument_no_original(address, callback)` to trap and skip original opcode
 - `inline_hook(addr, replace_fn)` with automatic far-jump fallback
 - zero-copy context remap (`HookContext`) in callbacks
-- register union access: `ctx.regs.x[i]` and `ctx.regs.named.xN`
+- architecture-specific callback context (`aarch64` and `x86_64` layouts)
 
 ## Platform
 
 - macOS on Apple Silicon (`aarch64`)
+- Linux (`aarch64`, `x86_64`)
 - single-thread model (`static mut` internal state)
 
 ## Installation
 
 ```toml
 [dependencies]
-sighook = "0.1"
+sighook = "0.2"
 ```
 
 ## Quick Start
@@ -41,10 +42,7 @@ sighook = "0.1"
 use sighook::{instrument, HookContext};
 
 extern "C" fn on_hit(_address: u64, ctx: *mut HookContext) {
-    unsafe {
-        // Example: touch a register before original opcode executes.
-        (*ctx).regs.named.x0 = (*ctx).regs.named.x0.wrapping_add(1);
-    }
+    let _ = ctx;
 }
 
 let target_instruction = 0x1000_0000_u64;
@@ -58,10 +56,7 @@ let _original = instrument(target_instruction, on_hit)?;
 use sighook::{instrument_no_original, HookContext};
 
 extern "C" fn replace_logic(_address: u64, ctx: *mut HookContext) {
-    unsafe {
-        // Example: fully replace behavior by editing result register directly.
-        (*ctx).regs.named.x0 = 0x1234;
-    }
+    let _ = ctx;
 }
 
 let target_instruction = 0x1000_0010_u64;
@@ -84,10 +79,9 @@ let _original = inline_hook(function_entry, replacement_addr)?;
 
 ## API Notes
 
-- `instrument(...)` executes original opcode through an internal trampoline.
-- `instrument_no_original(...)` skips original opcode unless callback changes `ctx.pc`.
-- `inline_hook(...)` first tries direct `b`; if out of range, it patches a far-jump stub.
-- `inline_hook(...)` uses `b` (not `bl`), so replacement returns to original caller via `lr`.
+- `instrument(...)` executes original instruction through an internal trampoline.
+- `instrument_no_original(...)` skips original instruction unless callback changes control-flow register (`pc`/`rip`).
+- `inline_hook(...)` uses architecture-specific near jump first, then far-jump fallback.
 
 ## Safety Notes
 

@@ -1,16 +1,24 @@
+#[cfg(target_arch = "aarch64")]
 use crate::constants::{BR_X16, LDR_X16_LITERAL_8};
 use crate::error::SigHookError;
 use crate::memory::last_errno;
 use libc::c_void;
 use std::ptr::null_mut;
 
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 unsafe extern "C" {
     fn sys_icache_invalidate(start: *mut c_void, len: usize);
 }
 
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+unsafe extern "C" {
+    fn __clear_cache(begin: *mut c_void, end: *mut c_void);
+}
+
 pub(crate) fn create_original_trampoline(
-    next_pc: u64,
-    original_opcode: u32,
+    address: u64,
+    original_bytes: &[u8],
+    step_len: u8,
 ) -> Result<u64, SigHookError> {
     let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
     if page_size <= 0 {
@@ -37,16 +45,58 @@ pub(crate) fn create_original_trampoline(
     }
 
     let base = memory as usize;
+    let next_pc = address.wrapping_add(step_len as u64);
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if original_bytes.len() != 4 {
+            return Err(SigHookError::InvalidAddress);
+        }
+
+        let mut insn = [0u8; 4];
+        insn.copy_from_slice(original_bytes);
+        let original_opcode = u32::from_le_bytes(insn);
+
+        unsafe {
+            std::ptr::write_unaligned(base as *mut u32, original_opcode.to_le());
+            std::ptr::write_unaligned((base + 4) as *mut u32, LDR_X16_LITERAL_8.to_le());
+            std::ptr::write_unaligned((base + 8) as *mut u32, BR_X16.to_le());
+            std::ptr::write_unaligned((base + 12) as *mut u64, next_pc.to_le());
+        }
+
+        flush_icache(memory, 20);
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        if original_bytes.is_empty() {
+            return Err(SigHookError::InvalidAddress);
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                original_bytes.as_ptr(),
+                base as *mut u8,
+                original_bytes.len(),
+            );
+        }
+
+        let jmp_site = base + original_bytes.len();
+        if let Ok(rel_jmp) = crate::memory::encode_jmp_rel32(jmp_site as u64, next_pc) {
+            unsafe {
+                std::ptr::copy_nonoverlapping(rel_jmp.as_ptr(), jmp_site as *mut u8, rel_jmp.len());
+            }
+            flush_icache(memory, original_bytes.len() + rel_jmp.len());
+        } else {
+            let abs = crate::memory::encode_absolute_jump(next_pc);
+            unsafe {
+                std::ptr::copy_nonoverlapping(abs.as_ptr(), jmp_site as *mut u8, abs.len());
+            }
+            flush_icache(memory, original_bytes.len() + abs.len());
+        }
+    }
 
     unsafe {
-        #[allow(clippy::identity_op)]
-        std::ptr::write_unaligned((base + 0) as *mut u32, original_opcode.to_le());
-        std::ptr::write_unaligned((base + 4) as *mut u32, LDR_X16_LITERAL_8.to_le());
-        std::ptr::write_unaligned((base + 8) as *mut u32, BR_X16.to_le());
-        std::ptr::write_unaligned((base + 12) as *mut u64, next_pc.to_le());
-
-        sys_icache_invalidate(memory, 20);
-
         if libc::mprotect(memory, page_size, libc::PROT_READ | libc::PROT_EXEC) != 0 {
             return Err(SigHookError::TrampolineProtectFailed {
                 errno: last_errno(),
@@ -55,4 +105,22 @@ pub(crate) fn create_original_trampoline(
     }
 
     Ok(base as u64)
+}
+
+fn flush_icache(start: *mut c_void, len: usize) {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    unsafe {
+        sys_icache_invalidate(start, len);
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    unsafe {
+        let end = (start as usize).wrapping_add(len) as *mut c_void;
+        __clear_cache(start, end);
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        let _ = (start, len);
+    }
 }

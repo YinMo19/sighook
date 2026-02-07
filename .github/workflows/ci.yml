@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  rust:
+  rust-macos-aarch64:
     runs-on: macos-14
 
     steps:
@@ -30,3 +30,40 @@ jobs:
 
       - name: Cargo clippy
         run: cargo clippy --all-targets --target aarch64-apple-darwin -- -D warnings
+
+  rust-linux-x86_64:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+          components: rustfmt, clippy
+
+      - name: Cargo check
+        run: cargo check --all-targets --target x86_64-unknown-linux-gnu
+
+      - name: Cargo test
+        run: cargo test --doc --target x86_64-unknown-linux-gnu
+
+      - name: Cargo clippy
+        run: cargo clippy --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
+
+  rust-linux-aarch64-check:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Cargo check (lib only)
+        run: cargo check --lib --target aarch64-unknown-linux-gnu

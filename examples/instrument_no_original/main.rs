@@ -4,7 +4,15 @@ const ADD_INSN_OFFSET: u64 = 0x14;
 
 extern "C" fn replace_logic(_address: u64, ctx: *mut HookContext) {
     unsafe {
-        (*ctx).regs.named.x0 = 99;
+        #[cfg(target_arch = "aarch64")]
+        {
+            (*ctx).regs.named.x0 = 99;
+        }
+
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        {
+            (*ctx).rax = 99;
+        }
     }
 }
 
