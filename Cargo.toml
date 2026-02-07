@@ -1,0 +1,20 @@
+[package]
+name = "sighook"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["YinMo19 <me@yinmo19.top>"]
+description = "A macOS (aarch64) runtime instrumentation and inline hooking crate."
+readme = "README.md"
+license = "GPL-2.0-only"
+repository = "https://github.com/YinMo19"
+homepage = "https://blog.yinmo19.top"
+documentation = "https://docs.rs/sighook"
+keywords = ["macos", "aarch64", "hook", "instrumentation", "signal"]
+
+[lib]
+name = "sighook"
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+libc = "0.2"
