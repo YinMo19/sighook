@@ -187,8 +187,8 @@ jobs:
       - name: Cargo check
         run: cargo check --all-targets --target aarch64-apple-ios
 
-      - name: Cargo test
-        run: cargo test --doc --target aarch64-apple-ios
+      - name: Cargo check tests
+        run: cargo check --tests --target aarch64-apple-ios
 
       - name: Cargo clippy
         run: cargo clippy --all-targets --target aarch64-apple-ios -- -D warnings
@@ -223,8 +223,8 @@ jobs:
       - name: Cargo check
         run: cargo check --all-targets --target aarch64-linux-android
 
-      - name: Cargo test
-        run: cargo test --doc --target aarch64-linux-android
+      - name: Cargo check tests
+        run: cargo check --tests --target aarch64-linux-android
 
       - name: Cargo clippy
         run: cargo clippy --all-targets --target aarch64-linux-android -- -D warnings
