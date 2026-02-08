@@ -25,27 +25,22 @@ unsafe extern "C" {
     fn __clear_cache(begin: *mut c_void, end: *mut c_void);
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 #[inline]
 pub(crate) fn last_errno() -> c_int {
-    #[cfg(target_os = "macos")]
-    {
-        unsafe { *libc::__error() }
-    }
+    unsafe { *libc::__error() }
+}
 
-    #[cfg(target_os = "ios")]
-    {
-        unsafe { *libc::__error() }
-    }
+#[cfg(target_os = "linux")]
+#[inline]
+pub(crate) fn last_errno() -> c_int {
+    unsafe { *libc::__errno_location() }
+}
 
-    #[cfg(target_os = "linux")]
-    {
-        unsafe { *libc::__errno_location() }
-    }
-
-    #[cfg(target_os = "android")]
-    {
-        unsafe { *libc::__errno() }
-    }
+#[cfg(target_os = "android")]
+#[inline]
+pub(crate) fn last_errno() -> c_int {
+    unsafe { *libc::__errno() }
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -88,30 +83,28 @@ fn protect_range_start_len(address: usize, len: usize, page_size: usize) -> (usi
     (start, total)
 }
 
+#[cfg(target_arch = "aarch64")]
+#[inline]
+pub(crate) fn instruction_width(_address: u64) -> Result<u8, SigHookError> {
+    Ok(4)
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(crate) fn instruction_width(address: u64) -> Result<u8, SigHookError> {
-    #[cfg(target_arch = "aarch64")]
-    {
-        let _ = address;
-        Ok(4)
+    use iced_x86::{Decoder, DecoderOptions};
+
+    let mut bytes = [0u8; 15];
+    unsafe {
+        std::ptr::copy_nonoverlapping(address as *const u8, bytes.as_mut_ptr(), bytes.len());
     }
 
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
-        use iced_x86::{Decoder, DecoderOptions};
-
-        let mut bytes = [0u8; 15];
-        unsafe {
-            std::ptr::copy_nonoverlapping(address as *const u8, bytes.as_mut_ptr(), bytes.len());
-        }
-
-        let mut decoder = Decoder::with_ip(64, &bytes, address, DecoderOptions::NONE);
-        let instruction = decoder.decode();
-        if instruction.is_invalid() {
-            return Err(SigHookError::DecodeFailed);
-        }
-
-        Ok(instruction.len() as u8)
+    let mut decoder = Decoder::with_ip(64, &bytes, address, DecoderOptions::NONE);
+    let instruction = decoder.decode();
+    if instruction.is_invalid() {
+        return Err(SigHookError::DecodeFailed);
     }
+
+    Ok(instruction.len() as u8)
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]

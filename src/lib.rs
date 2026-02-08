@@ -40,35 +40,15 @@ pub use error::SigHookError;
 /// ```rust,no_run
 /// use sighook::patchcode;
 ///
-/// let address = 0x1000_0000u64;
-/// let old = patchcode(address, 0xD420_0000)?;
-/// let _ = old;
-/// # Ok::<(), sighook::SigHookError>(())
-/// ```
-#[cfg(target_arch = "aarch64")]
-pub fn patchcode(address: u64, new_opcode: u32) -> Result<u32, SigHookError> {
-    memory::patch_u32(address, new_opcode)
-}
-
-/// Replaces one machine instruction at `address` with `new_opcode`.
-///
-/// The function writes 4 bytes and returns the previously stored 4-byte value.
-/// Use this API when you already know the exact opcode encoding for your target architecture.
-///
-/// - On `aarch64`, `new_opcode` is a 32-bit ARM instruction word.
-/// - On Linux `x86_64`, `new_opcode` is written as 4 little-endian bytes.
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use sighook::patchcode;
-///
 /// let address = 0x7FFF_0000_0000u64;
 /// let old = patchcode(address, 0x90C3_9090)?;
 /// let _ = old;
 /// # Ok::<(), sighook::SigHookError>(())
 /// ```
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[cfg(any(
+    target_arch = "aarch64",
+    all(target_os = "linux", target_arch = "x86_64")
+))]
 pub fn patchcode(address: u64, new_opcode: u32) -> Result<u32, SigHookError> {
     memory::patch_u32(address, new_opcode)
 }
