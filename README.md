@@ -89,6 +89,55 @@ The examples are `cdylib` payloads that auto-run hook install logic via construc
 
 When your preload library resolves symbols from the target executable via `dlsym`, compile the target executable with `-rdynamic` on Linux/Android.
 
+## Android Guide (`arm64-v8a`)
+
+> For authorized security research and your own binaries only.
+
+If your workflow is “build a hook payload `.so` with `sighook`, then inject it into an existing target `.so` with `patchelf`”, use this pattern:
+
+1) Build hook payload
+
+```bash
+cargo build --release --target aarch64-linux-android
+```
+
+The output is usually:
+
+`target/aarch64-linux-android/release/libsighook_payload.so`
+
+2) Ensure constructor-based init in payload
+
+- Android uses `.init_array` constructor flow.
+- Put hook-install logic in an init function (same pattern as this repo examples).
+- Keep hook target symbols stable (for AArch64 examples, prefer explicit patchpoint symbols instead of hardcoded offsets).
+
+3) Inject payload into target `.so`
+
+```bash
+patchelf --add-needed libsighook_payload.so libtarget.so
+```
+
+Verify `DT_NEEDED`:
+
+```bash
+readelf -d libtarget.so | grep NEEDED
+```
+
+4) Package both `.so` files into APK
+
+- Place both files under the same ABI directory: `lib/arm64-v8a/`.
+- Keep SONAME / filenames consistent with what `DT_NEEDED` references.
+
+5) Re-sign and install APK, then verify
+
+- Sign with your own cert, install on test device, and inspect `logcat` for payload init logs.
+
+### Android-specific notes
+
+- Android linker namespace rules may block unexpected library paths/dependencies; keep payload dependencies minimal.
+- `patchelf` does not bypass SELinux, code-signing, or app sandbox boundaries.
+- For app-level preload-style experiments, Android `wrap.sh` (debuggable app) is another option, but `patchelf` patching is usually more deterministic for fixed target libs.
+
 ## Linux AArch64 Patchpoint Note
 
 For AArch64 Linux examples, `calc`-based demos export a dedicated `calc_add_insn` symbol and patch that symbol directly. This avoids brittle fixed-offset assumptions in toolchain-generated function layout.
