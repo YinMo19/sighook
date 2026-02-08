@@ -34,7 +34,7 @@ It is designed for low-level experimentation, reverse engineering, and custom ru
 
 ```toml
 [dependencies]
-sighook = "0.3.1"
+sighook = "0.4.0"
 ```
 
 ## Quick Start
