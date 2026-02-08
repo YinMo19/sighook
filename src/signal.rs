@@ -6,7 +6,7 @@ use libc::{c_int, c_void};
 use std::mem::zeroed;
 use std::ptr::null_mut;
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"))]
 extern "C" fn trap_handler(_sig: c_int, info: *mut libc::siginfo_t, uctx: *mut c_void) {
     use crate::context::remap_ctx;
     use crate::memory::{is_brk, read_u32};
@@ -40,7 +40,10 @@ extern "C" fn trap_handler(_sig: c_int, info: *mut libc::siginfo_t, uctx: *mut c
     });
 }
 
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    target_arch = "aarch64"
+))]
 extern "C" fn trap_handler(_sig: c_int, info: *mut libc::siginfo_t, uctx: *mut c_void) {
     use crate::context::{free_ctx, remap_ctx, write_back_ctx};
     use crate::memory::{is_brk, read_u32};

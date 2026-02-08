@@ -1,6 +1,6 @@
 use sighook::{HookContext, instrument_no_original};
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 const ADD_INSN_OFFSET: u64 = 0x14;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -21,14 +21,23 @@ extern "C" fn replace_logic(_address: u64, ctx: *mut HookContext) {
 }
 
 #[used]
-#[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,__mod_init_func"))]
-#[cfg_attr(target_os = "linux", unsafe(link_section = ".init_array"))]
+#[cfg_attr(
+    any(target_os = "macos", target_os = "ios"),
+    unsafe(link_section = "__DATA,__mod_init_func")
+)]
+#[cfg_attr(
+    any(target_os = "linux", target_os = "android"),
+    unsafe(link_section = ".init_array")
+)]
 static INIT_ARRAY: extern "C" fn() = init;
 
 extern "C" fn init() {
     unsafe {
         let target_address = {
-            #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+            #[cfg(all(
+                any(target_os = "linux", target_os = "android"),
+                target_arch = "aarch64"
+            ))]
             {
                 let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"calc_add_insn".as_ptr());
                 if symbol.is_null() {
@@ -46,7 +55,7 @@ extern "C" fn init() {
                 symbol as u64 + X86_PATCHPOINT_OFFSET
             }
 
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
             {
                 let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"calc".as_ptr());
                 if symbol.is_null() {

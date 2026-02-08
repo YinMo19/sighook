@@ -4,7 +4,7 @@ pub(crate) const MAX_INSTRUMENTS: usize = 256;
 pub(crate) const BRK_OPCODE: u32 = 0xD420_0000;
 #[cfg(target_arch = "aarch64")]
 pub(crate) const BRK_MASK: u32 = 0xFFE0_001F;
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"))]
 pub(crate) const VM_PROT_COPY: libc::vm_prot_t = 0x10;
 
 #[cfg(target_arch = "aarch64")]

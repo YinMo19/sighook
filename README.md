@@ -24,7 +24,9 @@ It is designed for low-level experimentation, reverse engineering, and custom ru
 ## Platform Support
 
 - `aarch64-apple-darwin`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
+- `aarch64-apple-ios`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
 - `aarch64-unknown-linux-gnu`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
+- `aarch64-linux-android`: full API support (`patchcode` / `instrument` / `instrument_no_original` / `inline_hook`)
 - `x86_64-unknown-linux-gnu`: full API support; CI smoke validates `patchcode` / `instrument` / `instrument_no_original` / `inline_hook` examples
 - single-thread model (`static mut` internal state)
 
@@ -82,10 +84,10 @@ let _original = inline_hook(function_entry, replacement_addr)?;
 
 The examples are `cdylib` payloads that auto-run hook install logic via constructor sections:
 
-- macOS uses `__DATA,__mod_init_func` + `DYLD_INSERT_LIBRARIES`
-- Linux uses `.init_array` + `LD_PRELOAD`
+- Apple targets (macOS/iOS) use `__DATA,__mod_init_func` + dyld preload/injection flow
+- Linux/Android targets use `.init_array` + `LD_PRELOAD`-style flow
 
-When your preload library resolves symbols from the target executable via `dlsym`, compile the target executable with `-rdynamic` on Linux.
+When your preload library resolves symbols from the target executable via `dlsym`, compile the target executable with `-rdynamic` on Linux/Android.
 
 ## Linux AArch64 Patchpoint Note
 

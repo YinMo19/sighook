@@ -6,7 +6,7 @@ Last updated: 2026-02-07
 
 - Crate: `sighook`
 - Current version: `0.3.1`
-- Status: multi-platform runtime hook crate with published Linux + macOS support.
+- Status: multi-platform runtime hook crate with Apple/Linux/Android support (AArch64 + Linux x86_64).
 - Current architecture focus: platform-specific backend code behind stable public API.
 
 ### Public APIs (stable signatures)
@@ -30,7 +30,9 @@ Last updated: 2026-02-07
 ### Fully supported targets
 
 - `aarch64-apple-darwin`
+- `aarch64-apple-ios`
 - `aarch64-unknown-linux-gnu`
+- `aarch64-linux-android`
 - `x86_64-unknown-linux-gnu`
 
 ### CI jobs (always-on for active matrix)
@@ -96,6 +98,8 @@ cargo check --all-targets
 cargo test --doc
 cargo clippy --all-targets -- -D warnings
 cargo check --all-targets --target aarch64-apple-darwin
+cargo check --all-targets --target aarch64-apple-ios
+cargo check --all-targets --target aarch64-linux-android
 cargo check --all-targets --target x86_64-unknown-linux-gnu
 ```
 
@@ -108,6 +112,6 @@ cargo clippy --all-targets --target aarch64-unknown-linux-gnu -- -D warnings
 
 ## 7) Near-term Next Steps
 
-- Android support (AArch64 first): signal/context backend split and loader model decisions.
-- iOS support: constructor/init flow parity, signal/exception constraints, code-sign/protection constraints.
+- Add CI matrix coverage for `aarch64-apple-ios` and `aarch64-linux-android` compile checks.
+- Validate runtime hooking behavior on real iOS/Android environments (trap delivery and patch permissions).
 - Optional: introduce a lightweight backend trait to reduce cfg branching in `lib.rs` and simplify future ports.

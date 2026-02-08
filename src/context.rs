@@ -80,12 +80,15 @@ pub struct HookContext {
 
 pub type InstrumentCallback = extern "C" fn(address: u64, ctx: *mut HookContext);
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"))]
 pub unsafe fn remap_ctx(thread_state: *mut libc::__darwin_arm_thread_state64) -> *mut HookContext {
     thread_state.cast::<HookContext>()
 }
 
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    target_arch = "aarch64"
+))]
 pub unsafe fn remap_ctx(_uc: *mut libc::ucontext_t) -> *mut HookContext {
     let mcontext = unsafe { &mut (*_uc).uc_mcontext };
     let mut regs = [0u64; 31];
@@ -105,7 +108,10 @@ pub unsafe fn remap_ctx(_uc: *mut libc::ucontext_t) -> *mut HookContext {
     Box::into_raw(Box::new(ctx))
 }
 
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    target_arch = "aarch64"
+))]
 pub unsafe fn write_back_ctx(_uc: *mut libc::ucontext_t, ctx: *mut HookContext) {
     let mcontext = unsafe { &mut (*_uc).uc_mcontext };
     let ctx = unsafe { &*ctx };
@@ -120,7 +126,10 @@ pub unsafe fn write_back_ctx(_uc: *mut libc::ucontext_t, ctx: *mut HookContext) 
     mcontext.pstate = ctx.cpsr as libc::c_ulonglong;
 }
 
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    target_arch = "aarch64"
+))]
 pub unsafe fn free_ctx(ctx: *mut HookContext) {
     let _ = unsafe { Box::from_raw(ctx) };
 }

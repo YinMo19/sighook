@@ -2,11 +2,16 @@
 #![doc = include_str!("../README.md")]
 
 #[cfg(not(any(
-    all(target_os = "macos", target_arch = "aarch64"),
-    all(target_os = "linux", target_arch = "aarch64"),
+    all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"),
+    all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "aarch64"
+    ),
     all(target_os = "linux", target_arch = "x86_64")
 )))]
-compile_error!("sighook only supports macOS aarch64, Linux aarch64, and Linux x86_64.");
+compile_error!(
+    "sighook only supports Apple aarch64 (macOS/iOS), Linux/Android aarch64, and Linux x86_64."
+);
 
 mod constants;
 mod context;
@@ -139,11 +144,7 @@ fn instrument_internal(
 
         signal::ensure_handlers_installed()?;
 
-        #[cfg(target_arch = "aarch64")]
-        let step_len: u8 = memory::instruction_width();
-
-        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-        let step_len: u8 = memory::instruction_width_at(address)?;
+        let step_len: u8 = memory::instruction_width(address)?;
 
         #[cfg(target_arch = "aarch64")]
         let original_bytes = {

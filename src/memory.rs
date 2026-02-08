@@ -1,11 +1,11 @@
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"))]
 use crate::constants::VM_PROT_COPY;
 #[cfg(target_arch = "aarch64")]
 use crate::constants::{BR_X16, BRK_MASK, BRK_OPCODE, LDR_X16_LITERAL_8};
 use crate::error::SigHookError;
 use libc::{c_int, c_void};
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"))]
 unsafe extern "C" {
     fn sys_icache_invalidate(start: *mut c_void, len: usize);
     fn mach_vm_protect(
@@ -17,7 +17,10 @@ unsafe extern "C" {
     ) -> libc::kern_return_t;
 }
 
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    target_arch = "aarch64"
+))]
 unsafe extern "C" {
     fn __clear_cache(begin: *mut c_void, end: *mut c_void);
 }
@@ -29,9 +32,19 @@ pub(crate) fn last_errno() -> c_int {
         unsafe { *libc::__error() }
     }
 
+    #[cfg(target_os = "ios")]
+    {
+        unsafe { *libc::__error() }
+    }
+
     #[cfg(target_os = "linux")]
     {
         unsafe { *libc::__errno_location() }
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        unsafe { *libc::__errno() }
     }
 }
 
@@ -75,28 +88,30 @@ fn protect_range_start_len(address: usize, len: usize, page_size: usize) -> (usi
     (start, total)
 }
 
-#[cfg(target_arch = "aarch64")]
-#[inline]
-pub(crate) fn instruction_width() -> u8 {
-    4
-}
-
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-pub(crate) fn instruction_width_at(_address: u64) -> Result<u8, SigHookError> {
-    use iced_x86::{Decoder, DecoderOptions};
-
-    let mut bytes = [0u8; 15];
-    unsafe {
-        std::ptr::copy_nonoverlapping(_address as *const u8, bytes.as_mut_ptr(), bytes.len());
+pub(crate) fn instruction_width(address: u64) -> Result<u8, SigHookError> {
+    #[cfg(target_arch = "aarch64")]
+    {
+        let _ = address;
+        Ok(4)
     }
 
-    let mut decoder = Decoder::with_ip(64, &bytes, _address, DecoderOptions::NONE);
-    let instruction = decoder.decode();
-    if instruction.is_invalid() {
-        return Err(SigHookError::DecodeFailed);
-    }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        use iced_x86::{Decoder, DecoderOptions};
 
-    Ok(instruction.len() as u8)
+        let mut bytes = [0u8; 15];
+        unsafe {
+            std::ptr::copy_nonoverlapping(address as *const u8, bytes.as_mut_ptr(), bytes.len());
+        }
+
+        let mut decoder = Decoder::with_ip(64, &bytes, address, DecoderOptions::NONE);
+        let instruction = decoder.decode();
+        if instruction.is_invalid() {
+            return Err(SigHookError::DecodeFailed);
+        }
+
+        Ok(instruction.len() as u8)
+    }
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -114,7 +129,7 @@ fn patch_bytes(address: u64, bytes: &[u8]) -> Result<Vec<u8>, SigHookError> {
     let addr = address as usize;
     let (protect_start, protect_len) = protect_range_start_len(addr, bytes.len(), page_size);
 
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"))]
     {
         let kr = unsafe {
             mach_vm_protect(
@@ -135,7 +150,7 @@ fn patch_bytes(address: u64, bytes: &[u8]) -> Result<Vec<u8>, SigHookError> {
     }
 
     #[cfg(all(
-        target_os = "linux",
+        any(target_os = "linux", target_os = "android"),
         any(target_arch = "aarch64", target_arch = "x86_64")
     ))]
     {
@@ -162,7 +177,7 @@ fn patch_bytes(address: u64, bytes: &[u8]) -> Result<Vec<u8>, SigHookError> {
 
     flush_instruction_cache(addr as *mut c_void, bytes.len());
 
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"))]
     {
         let kr_restore = unsafe {
             mach_vm_protect(
@@ -182,7 +197,7 @@ fn patch_bytes(address: u64, bytes: &[u8]) -> Result<Vec<u8>, SigHookError> {
     }
 
     #[cfg(all(
-        target_os = "linux",
+        any(target_os = "linux", target_os = "android"),
         any(target_arch = "aarch64", target_arch = "x86_64")
     ))]
     {
@@ -241,12 +256,15 @@ pub(crate) fn patch_bytes_public(address: u64, bytes: &[u8]) -> Result<Vec<u8>, 
 }
 
 fn flush_instruction_cache(address: *mut c_void, len: usize) {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(all(any(target_os = "macos", target_os = "ios"), target_arch = "aarch64"))]
     unsafe {
         sys_icache_invalidate(address, len);
     }
 
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "aarch64"
+    ))]
     unsafe {
         let end = (address as usize).wrapping_add(len) as *mut c_void;
         __clear_cache(address, end);
