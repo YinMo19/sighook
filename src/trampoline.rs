@@ -107,9 +107,7 @@ pub(crate) unsafe fn free_original_trampoline(trampoline_pc: u64) {
         return;
     }
 
-    unsafe {
-        let _ = libc::munmap(trampoline_pc as *mut c_void, page_size as usize);
-    }
+    unsafe { libc::munmap(trampoline_pc as *mut c_void, page_size as usize) };
 }
 
 #[cfg(all(target_arch = "x86_64", any(target_os = "linux", target_os = "macos")))]

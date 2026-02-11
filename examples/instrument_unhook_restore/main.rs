@@ -6,7 +6,7 @@ const ADD_INSN_OFFSET: u64 = 0x14;
 #[cfg(all(target_arch = "x86_64", any(target_os = "linux", target_os = "macos")))]
 const X86_PATCHPOINT_OFFSET: u64 = 0x4;
 
-extern "C" fn on_hit_should_not_run(_address: u64, ctx: *mut HookContext) {
+extern "C" fn hook_callback(_address: u64, ctx: *mut HookContext) {
     unsafe {
         #[cfg(target_arch = "aarch64")]
         {
@@ -72,7 +72,7 @@ extern "C" fn init() {
             }
         };
 
-        let _ = instrument(target_address, on_hit_should_not_run);
+        let _ = instrument(target_address, hook_callback);
 
         let hooked = calc_fn(3, 4);
         println!("hooked_calc(3, 4) = {hooked}");
