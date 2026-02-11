@@ -30,6 +30,7 @@ Available examples:
 - `instrument_with_original`: BRK instrumentation + execute original opcode
 - `instrument_no_original`: BRK instrumentation + skip original opcode
 - `instrument_adrp_no_original`: aarch64 `adrp` patch-point via `instrument_no_original` + manual callback emulation
+- `instrument_unhook_restore`: instrument + unhook restore demo
 - `inline_hook_far`: function-entry detour with inline hook
 
 ## Coverage matrix
